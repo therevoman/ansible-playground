@@ -1,0 +1,44 @@
+---
+- hosts: localhost
+  module_defaults:
+    group/k8s:
+      host: api.sno.openshift.works:6443
+  tasks:
+  - block:
+    # It's good practice to store login credentials in a secure vault and not
+    # directly in playbooks.
+#    - include_vars: k8s_passwords.yml
+
+    - name: Log in (obtain access token)
+      k8s_auth:
+        host: https://api.sno.openshift.works:6443
+        username: nrevo
+        password: "my-password"
+        validate_certs: false
+      register: k8s_auth_results
+
+    - debug:
+        msg: "{{ k8s_auth_results }}"
+
+    - name: Show pods in default namespace
+      k8s_info:
+        host: https://api.sno.openshift.works:6443
+        api_key: "{{ k8s_auth_results.openshift_auth.api_key }}"
+        kind: Pod
+        namespace: default
+        validate_certs: false
+      register: pod_list
+
+    - debug:
+        msg: "{{pod_list}}"
+
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      k8s_auth:
+        state: absent
+        host: https://api.sno.openshift.works:6443
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        validate_certs: false
+
+    - debug:
+        msg: "{{ k8s_auth_results }}"
